@@ -23,17 +23,208 @@ mindmap
 
 ## Encapsulamento
 
-Esconder detalhes internos e expor apenas o necessario. Sem encapsulamento, qualquer parte do sistema poderia colocar um saldo negativo sem regra.
+Esconder detalhes internos e expor apenas o necessario. Sem encapsulamento, qualquer parte do sistema poderia colocar um saldo negativo sem regra. A classe define uma "fronteira" que protege seu estado e controla como o mundo externo interage com ela.
 
 ## Heranca
 
-Uma classe especializada reaproveita e estende uma classe base. Relacao "e-um": um `Gerente` *e um* `Funcionario`.
+Uma classe especializada reaproveita e estende uma classe base. A palavra `virtual` na base indica que o metodo pode ser sobrescrito. A palavra `override` na derivada substitui a implementacao.
 
-A palavra `virtual` na base indica que o metodo pode ser sobrescrito. A palavra `override` na derivada substitui a implementacao.
+### A relacao "E-um" (Is-A)
+
+Heranca modela a relacao **"e-um"** (is-a): uma `ContaCorrente` *e uma* `ContaBancaria`. Um `Cachorro` *e um* `Animal`. Isso significa que a subclasse pode ser usada em qualquer lugar onde a superclasse e esperada.
+
+A pergunta que valida a heranca e: **"Faz sentido dizer que X e um Y?"**
+
+- "Um Gerente *e um* Funcionario" → ✅ faz sentido
+- "Um Cachorro *e um* Animal" → ✅ faz sentido
+- "Um Motor *e um* Carro" → ❌ nao faz sentido (motor *faz parte de* um carro)
+
+Se a resposta e "nao", a relacao nao e heranca — e composicao (Has-A), como veremos adiante.
+
+### O perigo de heranca profunda
+
+Heranca parece a solucao perfeita para reuso, mas cadeias profundas criam problemas serios:
+
+```
+Ser
+  └─ SerVivo
+       └─ Animal
+            └─ Mamifero
+                 └─ AnimalDomestico
+                      └─ Cachorro
+                           └─ CachorroPastor
+                                └─ CachorroPastorAlemaoBranco
+```
+
+Problemas com hierarquias profundas:
+
+1. **Fragilidade**: qualquer mudanca na classe `Animal` pode quebrar todas as 5 classes abaixo dela. Quanto mais niveis, mais efeitos colaterais inesperados.
+
+2. **Rigidez**: se precisarmos de um `AnimalDomestico` que nao e `Mamifero` (como um papagaio), a hierarquia inteira nao funciona.
+
+3. **Dificuldade de compreensao**: para entender o comportamento de `CachorroPastorAlemaoBranco`, voce precisa ler 7 classes em cadeia.
+
+4. **Acoplamento forte**: a subclasse depende de detalhes internos da superclasse. Mudar a implementacao da base pode forcar mudancas em cascata.
+
+**Regra pratica**: tente manter hierarquias com no maximo 2–3 niveis. Se voce precisa de mais, provavelmente esta usando heranca onde deveria usar composicao.
+
+### A relacao "Tem-um" (Has-A) e Composicao
+
+A alternativa a heranca e **composicao**: em vez de herdar comportamento, o objeto **contem** outro objeto que fornece esse comportamento. A relacao e **"tem-um"** (has-a): um `Carro` *tem um* `Motor`. Uma `ContaBancaria` *tem um* `Extrato`.
+
+```csharp
+// HERANCA (is-a): Carro E-UM Veiculo
+public class Veiculo { public void Mover() { } }
+public class Carro : Veiculo { } // herda Mover()
+
+// COMPOSICAO (has-a): Carro TEM-UM Motor
+public class Motor
+{
+    public void Ligar() => Console.WriteLine("Motor ligado");
+    public void Desligar() => Console.WriteLine("Motor desligado");
+}
+
+public class Carro
+{
+    private readonly Motor motor = new(); // TEM-UM motor
+
+    public void Ligar() => motor.Ligar();  // delega ao motor
+    public void Desligar() => motor.Desligar();
+}
+```
+
+### "Favor composition over inheritance"
+
+Esse e um dos principios mais repetidos em design orientado a objetos (presente no livro "Design Patterns" da Gang of Four). Significa: **prefira composicao a heranca** quando ambas resolverem o problema.
+
+Por que?
+
+| Criterio | Heranca | Composicao |
+|----------|---------|------------|
+| Acoplamento | Forte (subclasse depende dos internos da base) | Fraco (depende apenas da interface publica) |
+| Flexibilidade | Decidida em compilacao | Pode trocar em runtime |
+| Reuso | Rigido (heranca unica em C#) | Flexivel (pode compor N objetos) |
+| Testabilidade | Dificil isolar | Facil substituir dependencias |
+
+**Exemplo classico do problema**: imagine que voce quer criar entidades que podem voar, nadar e andar. Com heranca:
+
+```csharp
+// Heranca: hierarquia impossivel
+public class Animal { }
+public class AnimalVoador : Animal { public void Voar() { } }
+public class AnimalNadador : Animal { public void Nadar() { } }
+// Pato voa E nada... herda de quem? C# nao tem heranca multipla!
+```
+
+Com composicao via interfaces:
+
+```csharp
+public interface IVoador { void Voar(); }
+public interface INadador { void Nadar(); }
+public interface ICaminhante { void Andar(); }
+
+public class Pato : IVoador, INadador, ICaminhante
+{
+    public void Voar() => Console.WriteLine("Pato voando");
+    public void Nadar() => Console.WriteLine("Pato nadando");
+    public void Andar() => Console.WriteLine("Pato andando");
+}
+
+public class Pinguim : INadador, ICaminhante
+{
+    public void Nadar() => Console.WriteLine("Pinguim nadando");
+    public void Andar() => Console.WriteLine("Pinguim andando");
+    // Pinguim nao voa — simplesmente nao implementa IVoador
+}
+```
+
+Composicao via interfaces permite combinar capacidades livremente, sem ficar preso a uma hierarquia rigida.
+
+### Quando heranca AINDA faz sentido
+
+Heranca nao e o inimigo — mas deve ser usada com criterio:
+
+- Quando a relacao "e-um" e genuina e estavel (improvavel de mudar)
+- Quando ha logica compartilhada substancial que seria duplicada sem heranca
+- Em hierarquias rasas (1–2 niveis)
+- Quando a classe base foi projetada para ser herdada (`abstract`, membros `virtual`)
+
+```mermaid
+flowchart TD
+    Q1{A relacao e genuinamente 'e-um'?}
+    Q1 -->|Nao| COMP[Use composicao Has-A]
+    Q1 -->|Sim| Q2{A hierarquia ficara com mais de 3 niveis?}
+    Q2 -->|Sim| COMP
+    Q2 -->|Nao| Q3{A base foi projetada para extensao?}
+    Q3 -->|Nao| COMP
+    Q3 -->|Sim| HER[Heranca e adequada]
+```
+
+## Acoplamento e Coesao
+
+Esses dois conceitos sao centrais para avaliar a qualidade do design OO.
+
+### Coesao
+
+Coesao mede o quanto os membros de uma classe estao relacionados entre si. **Alta coesao e bom**: todos os metodos e campos da classe servem a mesma responsabilidade.
+
+```csharp
+// ALTA coesao: tudo sobre calculo de imposto
+public class CalculadoraImposto
+{
+    public decimal CalcularIR(decimal renda) { /* ... */ return 0; }
+    public decimal CalcularINSS(decimal salario) { /* ... */ return 0; }
+    public decimal CalcularTotal(decimal renda) => CalcularIR(renda) + CalcularINSS(renda);
+}
+
+// BAIXA coesao: faz coisas nao relacionadas
+public class Utilitarios
+{
+    public decimal CalcularImposto(decimal renda) { /* ... */ return 0; }
+    public void EnviarEmail(string dest, string msg) { /* ... */ }
+    public string FormatarCpf(string cpf) { /* ... */ return ""; }
+    public void GerarRelatorio() { /* ... */ }
+}
+```
+
+### Acoplamento
+
+Acoplamento mede o grau de dependencia entre classes. **Baixo acoplamento e bom**: alterar uma classe nao exige alterar muitas outras.
+
+```csharp
+// ALTO acoplamento: depende da classe concreta
+public class Relatorio
+{
+    private readonly BancoDeDadosSqlServer banco = new(); // preso ao SQL Server
+    public void Gerar() { var dados = banco.Consultar("SELECT ..."); }
+}
+
+// BAIXO acoplamento: depende de abstracao
+public class Relatorio
+{
+    private readonly IFonteDados fonte;
+    public Relatorio(IFonteDados fonte) { this.fonte = fonte; }
+    public void Gerar() { var dados = fonte.Consultar(); }
+}
+```
+
+### A relacao entre os conceitos
+
+```mermaid
+flowchart LR
+    A[Alta Coesao] --> B[Cada classe faz UMA coisa bem]
+    C[Baixo Acoplamento] --> D[Classes dependem de abstracoes]
+    B --> E[Software facil de manter]
+    D --> E
+    F[Heranca profunda] --> G[Alto acoplamento]
+    H[Composicao + interfaces] --> C
+```
+
+O objetivo e maximizar coesao (cada classe focada) e minimizar acoplamento (classes independentes). Heranca profunda aumenta acoplamento. Composicao com interfaces favorece ambos.
 
 ## Abstracao
 
-Mostrar apenas a ideia essencial. Quem usa `IConta.Depositar(valor)` nao precisa saber se a conta e corrente, poupanca ou investimento.
+Mostrar apenas a ideia essencial. Quem usa `IConta.Depositar(valor)` nao precisa saber se a conta e corrente, poupanca ou investimento. A abstracao esconde a complexidade e expoe apenas o contrato necessario.
 
 ## Polimorfismo
 
@@ -55,7 +246,14 @@ Tratar objetos diferentes pelo mesmo contrato. Dois tipos:
 
 ## 🏦 Hands-on: App Bancario — Aplicando os 4 pilares
 
-Na v0.1 temos uma unica `ContaBancaria`. Mas o banco precisa de **conta corrente** e **conta poupanca** com comportamentos diferentes. Vamos aplicar todos os pilares.
+Na v0.1 temos uma unica `ContaBancaria`. Mas o banco precisa de **conta corrente** e **conta poupanca** com comportamentos diferentes. Vamos aplicar os pilares — e demonstrar que a heranca aqui e adequada porque a relacao "e-um" e genuina.
+
+### Por que heranca funciona aqui
+
+- "Uma ContaCorrente *e uma* ContaBancaria" → ✅
+- "Uma ContaPoupanca *e uma* ContaBancaria" → ✅
+- A hierarquia tem apenas 2 niveis (ContaBase → ContaCorrente/Poupanca) → ✅
+- Ha logica compartilhada real (Depositar, Saldo, Titular) → ✅
 
 ### Passo 1: Abstracao — interface `IConta`
 
@@ -124,7 +322,6 @@ public class ContaCorrente : ContaBase
     public override bool Sacar(decimal valor)
     {
         if (valor <= 0) return false;
-        // Conta corrente permite usar cheque especial
         if (valor > Saldo + LimiteChequeEspecial) return false;
         Saldo -= valor;
         return true;
@@ -146,7 +343,6 @@ public class ContaPoupanca : ContaBase
 
     public override bool Sacar(decimal valor)
     {
-        // Poupanca nao tem cheque especial
         if (valor <= 0 || valor > Saldo) return false;
         Saldo -= valor;
         return true;
@@ -159,16 +355,25 @@ public class ContaPoupanca : ContaBase
 }
 ```
 
+### Identificando Is-A e Has-A no MiniBank
+
+| Relacao | Tipo | Justificativa |
+|---------|------|---------------|
+| ContaCorrente → ContaBase | **Is-A** (heranca) | Uma CC *e uma* conta bancaria |
+| ContaPoupanca → ContaBase | **Is-A** (heranca) | Uma CP *e uma* conta bancaria |
+| ContaBase → Cliente | **Has-A** (composicao) | Uma conta *tem um* titular. Titular nao e um tipo de conta! |
+| ContaBase → Extrato | **Has-A** (composicao) | Uma conta *tem um* extrato |
+
+Se alguem tentasse `class Cliente : ContaBase` estaria errado — um cliente nao "e uma" conta.
+
 ### Passo 4: Polimorfismo em acao
 
 ```csharp
 var ana = new Cliente("Ana Silva", "123.456.789-00", "ana@email.com");
 
-// Polimorfismo: tratamos ambas como IConta
 IConta contaCorrente = new ContaCorrente("CC-001", ana, 1000m, limite: 500m);
 IConta contaPoupanca = new ContaPoupanca("CP-001", ana, 2000m);
 
-// Lista polimorfica
 var contas = new List<IConta> { contaCorrente, contaPoupanca };
 
 foreach (var conta in contas)
@@ -176,13 +381,8 @@ foreach (var conta in contas)
     Console.WriteLine(conta.ExibirExtrato());
 }
 
-// Conta corrente usa cheque especial:
-contaCorrente.Sacar(1200m); // OK — usa 200 do limite
-Console.WriteLine(contaCorrente.ExibirExtrato());
-// Saldo: -R$ 200,00 | Limite: R$ 500,00
-
-// Poupanca nao permite:
-bool ok = contaPoupanca.Sacar(9999m); // false
+contaCorrente.Sacar(1200m); // usa cheque especial
+bool ok = contaPoupanca.Sacar(9999m); // false — sem cheque especial
 ```
 
 ### Diagrama de classes atualizado
@@ -218,26 +418,18 @@ classDiagram
         +AplicarRendimento()
     }
 
-    IConta <|.. ContaBase
-    ContaBase <|-- ContaCorrente
-    ContaBase <|-- ContaPoupanca
-    ContaBase --> Cliente
+    IConta <|.. ContaBase : "e-um (is-a)"
+    ContaBase <|-- ContaCorrente : "e-um (is-a)"
+    ContaBase <|-- ContaPoupanca : "e-um (is-a)"
+    ContaBase --> Cliente : "tem-um (has-a)"
 ```
-
-### O que melhorou desde a v0.1
-
-| v0.1 | v0.2 |
-|------|------|
-| Classe unica | Hierarquia com base abstrata + especializacoes |
-| Sem contrato | Interface `IConta` define o contrato |
-| Mesma regra de saque | Cada tipo tem sua regra (polimorfismo) |
-| Sem cheque especial | Conta corrente tem limite |
-| Sem rendimento | Poupanca aplica rendimento |
 
 ---
 
 ## Exercicios
 
 1. Crie uma terceira conta `ContaInvestimento` que cobra taxa de 1% em saques. Adicione a lista polimorfica e teste.
-2. O que aconteceria se `ContaInvestimento` alterasse o comportamento de `Depositar()` de forma que quebrasse a expectativa do sistema? Relate com o principio de Liskov.
-3. Adicione uma propriedade `DataAbertura` em `ContaBase` e sobrescreva `ExibirExtrato()` em `ContaPoupanca` para incluir a taxa de rendimento.
+2. Um colega sugere criar `class Motor : Carro`. Explique porque isso viola o principio is-a e qual seria a modelagem correta.
+3. Considere um sistema com a hierarquia `Pessoa → Funcionario → Gerente → GerenteSenior → GerenteRegional → DiretorRegional`. Quais problemas essa hierarquia de 6 niveis pode causar? Como voce refatoraria usando composicao?
+4. Analise o MiniBank: identifique todas as relacoes is-a e has-a. Ha alguma que voce mudaria?
+5. Classifique cada par como alta/baixa coesao e alto/baixo acoplamento: (a) `ContaBase` do MiniBank, (b) uma classe hipotetica `FazTudo` que gerencia contas, envia emails e gera PDFs.

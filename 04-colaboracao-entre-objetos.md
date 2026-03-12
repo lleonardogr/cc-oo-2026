@@ -2,22 +2,220 @@
 
 ## Teoria
 
-POO nao e apenas criar classes — e fazer essas classes cooperarem. Relacoes principais:
+POO nao e apenas criar classes — e fazer essas classes cooperarem. Saber **como** conectar objetos e tao importante quanto saber cria-los. O tipo de relacao escolhido impacta diretamente a flexibilidade, a manutenibilidade e a testabilidade do sistema.
 
-| Relacao | Forca | Ciclo de vida | Exemplo |
-|---------|-------|---------------|---------|
-| Dependencia | Fraca | Temporaria | Metodo recebe parametro |
-| Associacao | Media | Independente | Aluno ↔ Matricula |
-| Agregacao | Media-alta | Partes sobrevivem | Time contem Jogadores |
-| Composicao | Forte | Partes morrem com o todo | Pedido contem Itens |
+## As quatro relacoes entre objetos
 
-**Pergunta-chave para diferenciar**: "Se o todo for destruido, a parte sobrevive?" Sim → agregacao. Nao → composicao.
+### 1. Dependencia — "usa temporariamente"
+
+A relacao mais fraca. Um objeto usa outro **apenas durante a execucao de um metodo** — como parametro, variavel local ou retorno. Quando o metodo termina, a relacao acaba. Nenhuma referencia e mantida.
+
+**Analogia**: voce pede um Uber. Durante a corrida, existe uma relacao. Quando chega ao destino, voce nao mantem referencia ao motorista.
+
+**Em UML**: seta tracejada (- - - →)
+
+**No codigo**: o objeto aparece como **parametro** ou **variavel local**, nunca como campo.
+
+```csharp
+public class EmissorExtrato
+{
+    // 'conta' e usada so durante o metodo — nao e armazenada
+    public void EmitirParaConsole(IConta conta)
+    {
+        Console.WriteLine($"{conta.Titular.Nome}: {conta.Saldo:C}");
+    }
+}
+```
+
+`EmissorExtrato` **depende** de `IConta`, mas nao mantem referencia. Se `IConta` mudar sua interface, `EmissorExtrato` pode ser afetado — por isso ainda e uma dependencia.
+
+**Sinal no codigo**: se voce ve `IConta` como tipo de parametro, mas nunca como campo da classe, e dependencia.
+
+### 2. Associacao — "conhece de forma estavel"
+
+Uma classe mantem referencia a outra como **campo ou propriedade**. A relacao e mais duradoura que dependencia, mas os objetos tem ciclos de vida **independentes** — ambos podem existir separadamente.
+
+**Analogia**: um professor e seus alunos. O professor conhece seus alunos, e os alunos conhecem seu professor. Mas se o professor se aposentar, os alunos continuam existindo (e vice-versa).
+
+**Em UML**: seta solida (—→) ou linha simples
+
+**No codigo**: o objeto aparece como **campo ou propriedade**.
+
+```csharp
+public class Matricula
+{
+    public Aluno Aluno { get; }     // associacao: Matricula conhece Aluno
+    public Turma Turma { get; }     // associacao: Matricula conhece Turma
+
+    public Matricula(Aluno aluno, Turma turma)
+    {
+        Aluno = aluno;   // recebe por fora — nao cria
+        Turma = turma;   // recebe por fora — nao cria
+    }
+}
+```
+
+**Sinal no codigo**: referencia como campo, mas o objeto e **recebido de fora** (via construtor ou setter), nao criado internamente.
+
+### 3. Agregacao — "contem, mas a parte sobrevive sozinha"
+
+Caso especial de associacao. O "todo" contem "partes", mas as partes podem existir independentemente. Se o todo for destruido, as partes continuam.
+
+**Analogia**: uma universidade tem departamentos. Se a universidade fechar, os professores dos departamentos continuam existindo — podem trabalhar em outra instituicao. Um time de futebol tem jogadores. Se o time acabar, os jogadores seguem suas carreiras.
+
+**Em UML**: losango vazio (◇—→) no lado do "todo"
+
+**No codigo**: o "todo" **recebe** as partes prontas, de fora. Nao as cria internamente.
+
+```csharp
+public class Banco
+{
+    private readonly List<Cliente> clientes = new();
+
+    // O banco recebe clientes criados externamente
+    public void AdicionarCliente(Cliente cliente)
+    {
+        clientes.Add(cliente);
+    }
+
+    // Se o Banco for destruido, os clientes continuam existindo
+    // porque foram criados fora e podem estar referenciados em outros lugares
+}
+```
+
+**Pergunta-chave**: "Se eu deletar o Banco, os clientes somem?" **Nao** — eles existiam antes do banco e podem existir sem ele. Logo, e agregacao.
+
+### 4. Composicao — "contem, e a parte morre com o todo"
+
+A relacao mais forte. O "todo" **cria** a parte internamente (ou a parte so faz sentido no contexto do todo). Se o todo for destruido, as partes perdem razao de existir.
+
+**Analogia**: um pedido de restaurante tem itens. Se o pedido for cancelado, os itens nao fazem sentido sozinhos — nao existem "itens soltos" sem pedido. Uma casa tem comodos. Se a casa for demolida, os comodos deixam de existir.
+
+**Em UML**: losango preenchido (◆—→) no lado do "todo"
+
+**No codigo**: a parte e **criada dentro** do todo (geralmente com `new` no construtor ou na declaracao do campo).
+
+```csharp
+public class ContaBancaria
+{
+    // Extrato e CRIADO pela conta — nao vem de fora
+    public Extrato Extrato { get; } = new();
+
+    // Se a conta for destruida, o extrato nao faz sentido sem ela
+}
+```
+
+**Pergunta-chave**: "Se eu deletar a ContaBancaria, o Extrato faz sentido sozinho?" **Nao** — ele pertence exclusivamente a essa conta. Logo, e composicao.
+
+## Comparacao detalhada
+
+```mermaid
+flowchart TD
+    Q1{Objeto A mantem referencia a B?}
+    Q1 -->|Nao — so usa em metodo| DEP[Dependencia]
+    Q1 -->|Sim — como campo| Q2{B pertence exclusivamente a A?}
+    Q2 -->|Nao — B existe independente| Q3{A contem B como parte?}
+    Q3 -->|Nao — so se conhecem| ASSOC[Associacao]
+    Q3 -->|Sim — mas B sobrevive sem A| AGREG[Agregacao]
+    Q2 -->|Sim — B morre com A| COMP[Composicao]
+```
+
+| | Dependencia | Associacao | Agregacao | Composicao |
+|---|---|---|---|---|
+| **Forca** | Fraca | Media | Media-alta | Forte |
+| **Duracao** | Temporaria | Estavel | Estavel | Permanente |
+| **Ciclo de vida** | Independente | Independente | Independente | Compartilhado |
+| **Quem cria a parte?** | Ninguem (so usa) | Recebida de fora | Recebida de fora | Criada internamente |
+| **Parte existe sem o todo?** | N/A | Sim | Sim | Nao |
+| **UML** | - - -→ | —→ | ◇—→ | ◆—→ |
+| **Exemplo** | EmissorExtrato → IConta | Professor ↔ Aluno | Banco → Cliente | Conta → Extrato |
+
+### Resumo visual com codigo
+
+```csharp
+// DEPENDENCIA: usa temporariamente
+class A {
+    void Metodo(B b) { b.FazAlgo(); }   // B nao e campo
+}
+
+// ASSOCIACAO: conhece de forma estavel
+class A {
+    private B b;
+    A(B b) { this.b = b; }              // B recebida de fora
+}
+
+// AGREGACAO: contem, parte sobrevive
+class Time {
+    private List<Jogador> jogadores = new();
+    void Adicionar(Jogador j) { jogadores.Add(j); }  // Jogador vem de fora
+}
+
+// COMPOSICAO: contem, parte morre com o todo
+class Pedido {
+    private List<ItemPedido> itens = new();  // itens criados pelo pedido
+    void AdicionarItem(string produto, int qtd) {
+        itens.Add(new ItemPedido(produto, qtd));  // cria internamente
+    }
+}
+```
+
+### Como distinguir agregacao de composicao na pratica
+
+A confusao mais comum e entre agregacao e composicao. Tres perguntas ajudam:
+
+1. **A parte foi criada pelo todo?** Se a parte e criada com `new` dentro do construtor/metodo do todo → tende a composicao.
+2. **A parte pode pertencer a outro todo simultaneamente?** Se sim → agregacao. (Um jogador pode estar em dois times? Se sim, agregacao.)
+3. **A parte tem identidade propria fora do todo?** Se nao → composicao. (Um item de pedido sem pedido? Nao faz sentido.)
+
+```mermaid
+flowchart LR
+    subgraph Agregacao
+        Banco --> |contem| Cliente1[Cliente Ana]
+        OutroSistema --> |tambem referencia| Cliente1
+    end
+
+    subgraph Composicao
+        Conta --> |possui| Ext[Extrato]
+        Ext -.- |ninguem mais\n referencia| X[orfao]
+    end
+```
+
+## Heranca como relacao (Is-A vs Has-A revisitado)
+
+Heranca tambem e uma forma de relacao — a mais forte de todas. Conforme discutido na Aula 2:
+
+- **Is-A** (heranca): `ContaCorrente : ContaBase` — CC *e uma* conta
+- **Has-A** (composicao): `ContaBase` tem um `Extrato` — conta *tem um* extrato
+
+**Erro classico**: usar heranca quando a relacao e has-a.
+
+```csharp
+// ERRADO: Motor nao E-UM Carro
+class Motor : Carro { }
+
+// CERTO: Carro TEM-UM Motor
+class Carro {
+    private Motor motor = new();
+}
+
+// ERRADO: Pilha nao E-UMA Lista
+class Pilha<T> : List<T> { }   // expoe metodos que nao fazem sentido para pilha
+
+// CERTO: Pilha TEM-UMA Lista (internamente)
+class Pilha<T> {
+    private readonly List<T> itens = new();  // esconde a lista
+    public void Empilhar(T item) => itens.Add(item);
+    public T Desempilhar() { var t = itens[^1]; itens.RemoveAt(itens.Count - 1); return t; }
+}
+```
+
+No segundo exemplo, se `Pilha<T>` herdasse de `List<T>`, o usuario poderia chamar `pilha.Insert(0, item)` ou `pilha.RemoveAt(3)` — operacoes que violam o conceito de pilha. Composicao esconde esses detalhes e expoe apenas o que faz sentido.
 
 ---
 
 ## 🏦 Hands-on: App Bancario — Relacoes entre objetos
 
-Nosso banco precisa de mais entidades e relacoes claras entre elas. Vamos adicionar `Banco`, `Transacao`, `Extrato` e `EmissorExtrato`.
+Vamos aplicar cada tipo de relacao no MiniBank.
 
 ### Diagrama de relacoes
 
@@ -26,7 +224,7 @@ classDiagram
     class Banco {
         +string Nome
         +AdicionarCliente(Cliente)
-        +AbrirConta(Cliente, TipoConta) IConta
+        +AbrirConta(Cliente) IConta
     }
     class Cliente {
         +string Nome
@@ -38,22 +236,25 @@ classDiagram
     class Transacao {
         +decimal Valor
         +DateTime Data
-        +TipoTransacao Tipo
-        +string Descricao
     }
     class Extrato {
-        +IReadOnlyList Transacoes
+        +IReadOnlyList~Transacao~ Transacoes
+    }
+    class EmissorExtrato {
+        +EmitirParaConsole(IConta)
     }
 
-    Banco o-- Cliente : agregacao
-    Cliente --> ContaBase : associacao
-    ContaBase *-- Extrato : composicao
-    Extrato *-- Transacao : composicao
+    Banco o-- Cliente : "agregacao\n(cliente existe sem o banco)"
+    Banco o-- ContaBase : "agregacao\n(conta pode migrar de banco)"
+    ContaBase --> Cliente : "associacao\n(titular recebido de fora)"
+    ContaBase *-- Extrato : "composicao\n(extrato criado pela conta)"
+    Extrato *-- Transacao : "composicao\n(transacao pertence ao extrato)"
+    EmissorExtrato ..> ContaBase : "dependencia\n(usa so no metodo)"
 ```
 
 ### `Transacao` e `Extrato` — composicao
 
-Uma transacao nao faz sentido sem a conta a qual pertence. O extrato e o conjunto de transacoes de uma conta. Ambos sao composicao.
+Uma transacao nao faz sentido sem o extrato/conta a qual pertence. O extrato e criado internamente pela conta.
 
 ```csharp
 // === MiniBank v0.4 — Colaboracao entre objetos ===
@@ -96,20 +297,24 @@ public class Extrato
 }
 ```
 
-### `ContaBase` agora tem `Extrato` (composicao)
+### `ContaBase` com Extrato (composicao) e Titular (associacao)
 
 ```csharp
 public abstract class ContaBase : IConta
 {
     public string Numero { get; }
     public decimal Saldo { get; protected set; }
+
+    // ASSOCIACAO: Titular recebido de fora (existe independente)
     public Cliente Titular { get; }
-    public Extrato Extrato { get; } = new(); // composicao: nasce com a conta
+
+    // COMPOSICAO: Extrato criado internamente (morre com a conta)
+    public Extrato Extrato { get; } = new();
 
     protected ContaBase(string numero, Cliente titular, decimal saldoInicial)
     {
         Numero = numero;
-        Titular = titular;
+        Titular = titular;    // recebido, nao criado
         Saldo = saldoInicial;
 
         if (saldoInicial > 0)
@@ -155,23 +360,22 @@ public class ContaCorrente : ContaBase
     {
         if (!Sacar(valor)) return false;
         destino.Depositar(valor);
-        // Corrige descricao da ultima transacao no extrato
         Extrato.Registrar(new Transacao(valor, TipoTransacao.Transferencia, $"Transferencia para {destino.Numero}"));
         return true;
     }
 }
 ```
 
-### `Banco` — agregacao de clientes
+### `Banco` — agregacao de clientes e contas
 
-O banco agrega clientes e cria contas. Se o banco "fechar", os clientes continuam existindo como pessoas.
+O banco agrega clientes e contas. Se o banco "fechar", os clientes continuam existindo como pessoas, e as contas poderiam teoricamente migrar para outro banco.
 
 ```csharp
 public class Banco
 {
     public string Nome { get; }
-    private readonly List<Cliente> clientes = new();
-    private readonly List<IConta> contas = new();
+    private readonly List<Cliente> clientes = new();     // agregacao
+    private readonly List<IConta> contas = new();        // agregacao
     private int proximoNumeroConta = 1;
 
     public Banco(string nome) { Nome = nome; }
@@ -180,7 +384,7 @@ public class Banco
     {
         if (clientes.Any(c => c.Cpf == cliente.Cpf))
             throw new InvalidOperationException("Cliente ja cadastrado.");
-        clientes.Add(cliente);
+        clientes.Add(cliente);  // recebe de fora, nao cria
     }
 
     public ContaCorrente AbrirContaCorrente(Cliente cliente, decimal saldoInicial = 0)
@@ -203,18 +407,30 @@ public class Banco
 
 ### `EmissorExtrato` — dependencia
 
-Dependencia fraca: usa a conta como parametro, mas nao mantem referencia.
+Usa a conta apenas como parametro do metodo. Nao armazena nenhuma referencia.
 
 ```csharp
 public class EmissorExtrato
 {
-    public void EmitirParaConsole(IConta conta)
+    public void EmitirParaConsole(IConta conta) // DEPENDENCIA: so usa no metodo
     {
         Console.WriteLine($"\n=== {conta.Titular.Nome} ===");
         Console.WriteLine(conta.ExibirExtrato());
     }
 }
 ```
+
+### Mapa de relacoes no MiniBank v0.4
+
+| Classe A | Classe B | Relacao | Evidencia no codigo |
+|----------|----------|---------|-------------------|
+| ContaBase | Extrato | Composicao | `= new()` no campo — criado internamente |
+| Extrato | Transacao | Composicao | Transacoes criadas e adicionadas pelo Extrato |
+| ContaBase | Cliente | Associacao | Recebido via construtor — existe independente |
+| Banco | Cliente | Agregacao | `Add()` recebe de fora — cliente sobrevive sem banco |
+| Banco | IConta | Agregacao | Banco gerencia, mas contas podem existir sem ele |
+| EmissorExtrato | IConta | Dependencia | Aparece so como parametro do metodo |
+| ContaCorrente | ContaBase | Heranca (is-a) | CC *e uma* conta |
 
 ### Testando tudo junto
 
@@ -256,6 +472,17 @@ sequenceDiagram
 
 ## Exercicios
 
-1. Adicione um metodo `BuscarContasPorCliente(Cliente)` no `Banco`.
-2. Implemente `Transferir` tambem em `ContaPoupanca`, sem cheque especial.
-3. Crie uma classe `Relatorio` que receba o `Banco` e imprima um resumo de todas as contas e seus saldos.
+1. Para cada par abaixo, classifique a relacao como dependencia, associacao, agregacao ou composicao. Justifique:
+   - Universidade e Departamento
+   - Departamento e Professor
+   - Pedido e ItemPedido
+   - Impressora e Documento (que ela imprime)
+   - Empresa e Funcionario
+
+2. No MiniBank, o `Banco` cria contas internamente (`AbrirContaCorrente` faz `new`). Isso torna a relacao Banco→Conta composicao em vez de agregacao? Discuta.
+
+3. Crie uma classe `Relatorio` que receba o `Banco` por parametro (dependencia) e imprima um resumo de todas as contas e seus saldos.
+
+4. Refatore o MiniBank para que `Banco` receba contas de fora (`AdicionarConta(IConta)`) em vez de cria-las internamente. Como isso muda o tipo de relacao?
+
+5. Considere a frase: "Um Aluno tem Notas. Se o Aluno for excluido, as Notas perdem sentido." Que tipo de relacao e essa? Implemente em codigo.
