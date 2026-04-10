@@ -1,6 +1,23 @@
 # Aula 8 - Delegates e Eventos em Profundidade
 
-## Teoria
+## Objetivo da aula
+
+Aprofundar o mecanismo por tras dos eventos introduzidos na Aula 6, usando delegates, lambdas e funcoes de ordem superior de forma mais consciente.
+
+## Pre-requisitos
+
+- dominar a versao `v0.6`
+- ter entendido o uso de `event EventHandler<T>` da Aula 6
+- saber ler lambdas simples em `C#`
+
+## Ao final, o aluno sera capaz de...
+
+- explicar a diferenca entre delegate, evento e lambda
+- criar pipelines de validacao com delegates customizados
+- usar `Action` e `Func` em cenarios de extensao do `MiniBank`
+- reconhecer que esta aula aprofunda um mecanismo ja introduzido, em vez de reiniciar o tema
+
+## Teoria essencial
 
 Um **delegate** e um tipo que guarda referencia a um metodo. Quando invocado, o metodo referenciado executa. O livro-base compara com um representante diplomatico: faz o trabalho no lugar de quem o designou.
 
@@ -18,9 +35,41 @@ Um **delegate** e um tipo que guarda referencia a um metodo. Quando invocado, o 
 Func<int, int, int> somar = (a, b) => a + b;
 ```
 
+## Erros e confusoes comuns
+
+- achar que delegate e "evento com outro nome"
+- usar lambda quando um metodo nomeado seria mais claro
+- trocar o evento idiomatico da Aula 6 por qualquer lista de `Action` sem perceber o tradeoff
+- esquecer de explicar por que esta aula e aprofundamento, nao repeticao
+
 ---
 
 ## 🏦 Hands-on: App Bancario — Pipeline de notificacoes e validacao
+
+### Estado atual do MiniBank
+
+- Versao de entrada: `v0.6`
+- Versao de saida: `v0.7`
+- Classes novas: `ValidadorTransacoes`, `Validacoes`, `CentralNotificacoes`, `ContaPoupancaFlex`
+- Classes alteradas: `ContaBase`
+- Comportamentos novos: pipeline de validacao, notificacao por `Action`, calculo dinamico via `Func`
+- Como testar no Main: registrar validacoes, inscrever handlers e aplicar rendimento com lambda customizada
+
+### O que muda nesta aula
+
+Saindo do evento idiomatico da Aula 6, agora o aluno ve o mecanismo subjacente com mais flexibilidade e mais responsabilidade de design.
+
+### Por que muda
+
+Esse segundo contato ajuda a entender que `event` e uma aplicacao controlada de delegates, e nao uma "mecanica magica" de `C#`.
+
+### Organizando o projeto
+
+1. Crie a pasta `Validation` para os componentes de validacao da aula.
+2. Adicione os arquivos `Validation/ValidadorTransacoes.cs` e `Validation/Validacoes.cs`.
+3. Na pasta `Services`, crie `CentralNotificacoes.cs`.
+4. Se optar por deixar o delegate nomeado em arquivo proprio, crie `Validation/ValidacaoTransacao.cs`.
+5. Em `Models/Contas`, adicione `ContaPoupancaFlex.cs` apenas se quiser manter o exemplo separado da `ContaPoupanca` principal.
 
 Vamos sofisticar o sistema de notificacoes e adicionar um pipeline de validacao de transacoes usando delegates.
 
@@ -227,8 +276,79 @@ if (validador.ValidarTodas(cc, 1500m))
 
 ---
 
+## Checklist de verificacao da versao
+
+- ha pelo menos um delegate customizado para validacao
+- `Action` e `Func` aparecem em cenarios em que seu uso faz sentido
+- o aluno consegue comparar o evento idiomatico da Aula 6 com a central baseada em `Action`
+- as validacoes sao compostas sem `if` gigante no metodo chamador
+- o fluxo de notificacao continua observavel no `Main`
+
 ## Exercicios
 
 1. Adicione uma validacao `ValidarHorarioComercial` que rejeita transacoes fora do horario 8h-18h.
 2. Crie um `Func<IConta, string>` para formatar extrato em diferentes formatos (texto, CSV, JSON). Teste com ao menos dois formatos.
 3. Implemente um sistema de "callbacks de confirmacao": antes de executar o saque, chame um `Func<decimal, bool>` que pede confirmacao.
+
+### Gabarito comentado
+
+1. Implementacao de referencia:
+
+```csharp
+public static bool ValidarHorarioComercial(IConta conta, decimal valor, out string motivo)
+{
+    motivo = "";
+    int hora = DateTime.Now.Hour;
+    if (hora < 8 || hora >= 18)
+    {
+        motivo = "Transacao fora do horario comercial.";
+        return false;
+    }
+    return true;
+}
+```
+
+Como verificar:
+- adicionar a validacao ao pipeline
+- executar fora do intervalo e observar a rejeicao com motivo
+
+2. Implementacao de referencia:
+
+```csharp
+Func<IConta, string> formatoTexto = conta => conta.ExibirExtrato();
+Func<IConta, string> formatoCsv = conta => $"{conta.Numero};{conta.Titular.Nome};{conta.Saldo}";
+```
+
+Como verificar:
+- a mesma conta produz duas strings com formatos diferentes
+
+3. Implementacao de referencia:
+
+```csharp
+public bool SacarComConfirmacao(decimal valor, Func<decimal, bool> confirmar)
+{
+    if (!confirmar(valor)) return false;
+    return Sacar(valor);
+}
+```
+
+Solucao minima: chamar o callback e, se retornar `true`, executar o saque.
+Solucao mais idiomatica: injetar o callback no fluxo apenas quando a regra de confirmacao fizer sentido para aquele caso de uso.
+
+Erros comuns:
+- usar `Action` quando e preciso retorno booleano
+- misturar validacao com efeito colateral no mesmo delegate sem necessidade
+- reapresentar o mesmo modelo de evento da Aula 6 sem explicar o tradeoff
+
+## Fechamento e conexao com a proxima aula
+
+Com delegates, o aluno passa a enxergar melhor o mecanismo que estava por tras dos eventos. A Aula 9 volta o foco para arquitetura: interfaces, DI, composicao raiz e testabilidade.
+
+### Versao esperada apos esta aula
+
+- Versao de entrada: `v0.6`
+- Versao de saida: `v0.7`
+- Classes novas: validadores, central de notificacoes e componente com `Func`
+- Classes alteradas: `ContaBase`
+- Comportamentos novos: pipeline de validacao, callbacks, notificacoes por handlers registrados
+- Como testar no Main: executar uma operacao aprovada e outra rejeitada pelo pipeline e comparar as saidas

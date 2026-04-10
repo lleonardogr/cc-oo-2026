@@ -20,6 +20,7 @@ As aulas sao conectadas por um **projeto bancario** construido incrementalmente.
 | 9 | v0.8 | DI com interfaces de repositorio, testes sem banco de dados |
 | 10 | v0.9 | Repositorio generico unificado, covariancia, metodos utilitarios |
 | 11 | v1.0 | Records, nullable refs, pattern matching, default interface methods |
+| 12 | v1.1 | Interface de console com Spectre.Console, menu interativo, tabelas e paineis |
 
 ## Trilha de aulas
 
@@ -49,6 +50,10 @@ As aulas sao conectadas por um **projeto bancario** construido incrementalmente.
 ### C# Moderno (Aula 11)
 
 12. [11-novidades-csharp-e-poo.md](./11-novidades-csharp-e-poo.md) — records, nullable, pattern matching, versao final v1.0
+
+### Interface e Produto (Aula 12)
+
+13. [12-interface-com-spectre-console.md](./12-interface-com-spectre-console.md) — interface de console com Spectre.Console para o MiniBank v1.1
 
 ## Observacao
 

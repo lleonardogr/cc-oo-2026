@@ -1,6 +1,23 @@
 # Aula 2 - Os Quatro Pilares da POO
 
-## Visao geral
+## Objetivo da aula
+
+Entender os quatro pilares da POO sem reduzir o tema a heranca, e aplicar esses pilares na evolucao do `MiniBank`.
+
+## Pre-requisitos
+
+- dominar a versao `v0.1` do `MiniBank`
+- entender construtores, propriedades e validacao basica
+- estar confortavel com leitura de classes em `C#`
+
+## Ao final, o aluno sera capaz de...
+
+- diferenciar conceito OO de mecanismo de linguagem
+- justificar quando heranca faz sentido e quando composicao e melhor
+- reconhecer abstracao e polimorfismo como contratos de uso
+- aplicar encapsulamento, heranca, abstracao e polimorfismo no `MiniBank`
+
+## Teoria essencial
 
 Os quatro pilares — encapsulamento, heranca, abstracao e polimorfismo — funcionam juntos para manter o codigo coeso e extensivel.
 
@@ -244,7 +261,39 @@ Tratar objetos diferentes pelo mesmo contrato. Dois tipos:
 
 ---
 
+## Erros e confusoes comuns
+
+- sair da aula achando que POO e sinonimo de heranca
+- usar heranca so para reaproveitar codigo
+- chamar qualquer interface de "abstracao boa" sem olhar o contrato
+- esquecer que composicao tambem e uma ferramenta central de OO
+
 ## 🏦 Hands-on: App Bancario — Aplicando os 4 pilares
+
+### Estado atual do MiniBank
+
+- Versao de entrada: `v0.1`
+- Versao de saida: `v0.2`
+- Classes novas: `IConta`, `ContaBase`, `ContaCorrente`, `ContaPoupanca`
+- Classes alteradas: o modelo anterior de `ContaBancaria` e refinado para uma hierarquia simples
+- Comportamentos novos: contratos de conta, saque polimorfico, especializacao por tipo de conta
+- Como testar no Main: colocar contas diferentes na mesma lista e chamar `Sacar` e `ExibirExtrato`
+
+### O que muda nesta aula
+
+Em vez de uma unica conta concreta, o banco passa a ter um contrato comum (`IConta`) e duas especializacoes com regras diferentes.
+
+### Por que muda
+
+O dominio agora tem variacao real de comportamento. Isso pede abstracao e polimorfismo, mas ainda com uma hierarquia curta e justificavel.
+
+### Organizando o projeto
+
+1. Crie a pasta `Contracts` para interfaces do dominio.
+2. Crie a pasta `Models/Contas` para os tipos de conta.
+3. Adicione o arquivo `Contracts/IConta.cs`.
+4. Em `Models/Contas`, crie `ContaBase.cs`, `ContaCorrente.cs` e `ContaPoupanca.cs`.
+5. Se a antiga `Models/ContaBancaria.cs` nao fizer mais sentido, substitua seu uso pela nova hierarquia para evitar dois modelos concorrentes.
 
 Na v0.1 temos uma unica `ContaBancaria`. Mas o banco precisa de **conta corrente** e **conta poupanca** com comportamentos diferentes. Vamos aplicar os pilares — e demonstrar que a heranca aqui e adequada porque a relacao "e-um" e genuina.
 
@@ -426,6 +475,14 @@ classDiagram
 
 ---
 
+## Checklist de verificacao da versao
+
+- existe um contrato `IConta` com membros essenciais
+- `ContaBase` concentra estado e comportamento compartilhado
+- `ContaCorrente` e `ContaPoupanca` sobrescrevem `Sacar`
+- uma lista `List<IConta>` consegue tratar contas diferentes pelo mesmo contrato
+- o aluno consegue justificar por que `ContaCorrente -> ContaBase` e heranca valida, mas `Motor -> Carro` nao
+
 ## Exercicios
 
 1. Crie uma terceira conta `ContaInvestimento` que cobra taxa de 1% em saques. Adicione a lista polimorfica e teste.
@@ -433,3 +490,53 @@ classDiagram
 3. Considere um sistema com a hierarquia `Pessoa → Funcionario → Gerente → GerenteSenior → GerenteRegional → DiretorRegional`. Quais problemas essa hierarquia de 6 niveis pode causar? Como voce refatoraria usando composicao?
 4. Analise o MiniBank: identifique todas as relacoes is-a e has-a. Ha alguma que voce mudaria?
 5. Classifique cada par como alta/baixa coesao e alto/baixo acoplamento: (a) `ContaBase` do MiniBank, (b) uma classe hipotetica `FazTudo` que gerencia contas, envia emails e gera PDFs.
+
+### Gabarito comentado
+
+1. Implementacao de referencia:
+
+```csharp
+public class ContaInvestimento : ContaBase
+{
+    public ContaInvestimento(string numero, Cliente titular, decimal saldoInicial = 0)
+        : base(numero, titular, saldoInicial) { }
+
+    public override bool Sacar(decimal valor)
+    {
+        if (valor <= 0) return false;
+        decimal total = valor * 1.01m;
+        if (total > Saldo) return false;
+        Saldo -= total;
+        return true;
+    }
+}
+```
+
+Como verificar:
+- a conta entra na mesma `List<IConta>`
+- sacar `100m` reduz `101m` do saldo
+
+2. Resposta esperada: `Motor` nao e um `Carro`; `Motor` faz parte de `Carro`. A modelagem correta e composicao, por exemplo `class Carro { private Motor motor; }`.
+3. Resposta esperada: a hierarquia profunda gera fragilidade, rigidez, dificuldade de compreensao e alto acoplamento entre niveis. Uma refatoracao aceitavel extrai papeis ou capacidades em objetos colaborativos, como `Cargo`, `PoliticaAprovacao`, `FaixaSalarial` ou `ResponsabilidadesGerenciais`.
+4. Resposta esperada: `ContaCorrente -> ContaBase` e `ContaPoupanca -> ContaBase` sao `is-a`; `ContaBase -> Cliente` e `has-a`. Uma resposta boa pode sugerir revisar qualquer heranca futura que exista apenas por reuso e nao por especializacao legitima.
+5. Resposta esperada:
+- `ContaBase`: alta coesao e acoplamento moderado/baixo, porque concentra responsabilidades do proprio dominio da conta
+- `FazTudo`: baixa coesao e alto acoplamento, porque mistura negocio, notificacao e relatorio em uma unica classe
+
+Erros comuns:
+- criar `ContaInvestimento` copiando tudo de `ContaCorrente` sem reaproveitar `ContaBase`
+- responder `Motor : Carro` apenas com "nao faz sentido" sem explicar `is-a` vs `has-a`
+- confundir coesao com quantidade de metodos
+
+## Fechamento e conexao com a proxima aula
+
+Os pilares agora aparecem em codigo real: contrato comum, base abstrata, especializacao e uso polimorfico. A Aula 3 aprofunda os recursos de `C#` que ajudam a materializar essas decisoes de design com mais clareza e seguranca.
+
+### Versao esperada apos esta aula
+
+- Versao de entrada: `v0.1`
+- Versao de saida: `v0.2`
+- Classes novas: `IConta`, `ContaBase`, `ContaCorrente`, `ContaPoupanca`
+- Classes alteradas: a conta unica da aula anterior e substituida por uma hierarquia curta
+- Comportamentos novos: polimorfismo de saque, extrato por tipo, especializacao por conta
+- Como testar no Main: criar contas diferentes, armazenar em `List<IConta>` e executar chamadas pelo mesmo contrato

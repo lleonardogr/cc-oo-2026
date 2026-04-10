@@ -1,6 +1,23 @@
 # Aula 11 - Novidades do C# que Fortalecem a POO
 
-## Teoria
+## Objetivo da aula
+
+Fechar a trilha mostrando como recursos modernos de `C#` fortalecem contratos, imutabilidade, expressividade e seguranca do design OO.
+
+## Pre-requisitos
+
+- dominar a versao `v0.9`
+- entender interfaces, generics, excecoes e eventos ja aplicados no `MiniBank`
+- reconhecer o que e entidade mutavel e o que e objeto de valor
+
+## Ao final, o aluno sera capaz de...
+
+- usar records para objetos de valor
+- aplicar nullable reference types de forma intencional
+- usar pattern matching para tornar decisoes mais legiveis
+- justificar quando recursos modernos melhoram o design OO em vez de apenas reduzir codigo
+
+## Teoria essencial
 
 `C#` evolui continuamente. Recursos de C# 8 em diante tem impacto direto na pratica de POO:
 
@@ -12,9 +29,41 @@
 - **Required members** (C# 11): inicializacao obrigatoria
 - **Primary constructors** (C# 12): menos boilerplate
 
+## Erros e confusoes comuns
+
+- trocar classes por records sem pensar em identidade e mutabilidade
+- ativar nullable sem revisar contratos
+- usar pattern matching apenas porque "ficou moderno"
+- tratar recurso novo como substituto automatico de modelagem boa
+
 ---
 
 ## 🏦 Hands-on: App Bancario — Modernizando o MiniBank
+
+### Estado atual do MiniBank
+
+- Versao de entrada: `v0.9`
+- Versao de saida: `v1.0`
+- Classes novas: `record Transacao`, DTOs modernos e utilitarios com pattern matching
+- Classes alteradas: `Cliente`, `IConta`, servicos e analise de contas
+- Comportamentos novos: igualdade por valor, nulidade explicita, classificacao por pattern matching, interfaces com implementacao padrao
+- Como testar no Main: comparar records, usar `with`, observar classificacoes e validar tratamento de nulos
+
+### O que muda nesta aula
+
+O sistema final nao muda de dominio, mas fica mais robusto e expressivo com recursos modernos da linguagem.
+
+### Por que muda
+
+Essa etapa fecha a trilha mostrando que evolucao de linguagem pode reforcar um bom design, e nao apenas encurtar sintaxe.
+
+### Organizando o projeto
+
+1. Crie a pasta `DTOs` para objetos usados na borda da aplicacao, como `AberturaConta`.
+2. Crie a pasta `Analysis` para componentes como `AnalisadorConta.cs`.
+3. Atualize `Models/Transacoes/Transacao.cs` para a versao em `record`.
+4. Atualize `Models/Cliente.cs` e os contratos em `Contracts` para refletir nullable reference types e default interface methods.
+5. Se criar resumos e projections, coloque-os em `DTOs/ContaResumo.cs` ou `ViewModels/ContaResumo.cs`, mantendo a ideia de separar modelo de dominio de objeto de exibicao.
 
 Versao final: aplicamos os recursos modernos ao nosso sistema bancario.
 
@@ -253,12 +302,68 @@ flowchart LR
 
 ---
 
+## Checklist de verificacao da versao
+
+- `Transacao` agora e objeto de valor com semantica coerente
+- `Cliente` explicita o que pode ser `null`
+- ha ao menos um exemplo de pattern matching com impacto real no dominio
+- a interface evolui sem quebrar implementadores existentes
+- o aluno consegue explicar por que o recurso moderno melhora o design, e nao apenas a sintaxe
+
 ## Exercicios finais
 
 1. Converta `TransacaoEventArgs` para record. Compare com a versao anterior.
 2. Adicione pattern matching no `ServicoTransferencia` para aplicar regras diferentes por tipo de conta (corrente cobra taxa, poupanca nao).
 3. Crie um `record ContaResumo(string Numero, string NomeTitular, decimal Saldo, string Tipo)` e um metodo que converte `IConta` em `ContaResumo`.
 4. Use nullable no `Banco` para retornar `IConta?` em buscas e trate o resultado com `?.` e `??` no chamador.
+
+### Gabarito comentado
+
+1. Implementacao de referencia:
+
+```csharp
+public record TransacaoEventArgs(Transacao Transacao, IConta Conta);
+```
+
+Resposta esperada: a versao com `record` reduz boilerplate e ganha igualdade por valor, o que faz sentido se o objeto for tratado como pacote imutavel de dados do evento.
+
+2. Implementacao de referencia:
+
+```csharp
+public decimal CalcularTaxa(IConta conta, decimal valor) => conta switch
+{
+    ContaCorrente => valor * 0.02m,
+    ContaPoupanca => 0m,
+    _ => 0m
+};
+```
+
+Como verificar:
+- corrente cobra taxa
+- poupanca nao cobra taxa
+
+3. Implementacao de referencia:
+
+```csharp
+public record ContaResumo(string Numero, string NomeTitular, decimal Saldo, string Tipo);
+
+public static ContaResumo Converter(IConta conta)
+    => new(conta.Numero, conta.Titular.Nome, conta.Saldo, conta.GetType().Name);
+```
+
+4. Implementacao de referencia:
+
+```csharp
+public IConta? BuscarConta(string numero)
+    => contas.FirstOrDefault(c => c.Numero == numero);
+
+var descricao = banco.BuscarConta("CC-001")?.ExibirExtrato() ?? "Conta nao encontrada";
+```
+
+Erros comuns:
+- converter entidade com identidade forte em `record` sem refletir sobre semantica
+- usar pattern matching sem cobrir caso padrao
+- ativar nullable e continuar ignorando `null` no chamador
 
 ## Projeto final sugerido
 
@@ -274,3 +379,27 @@ Junte todo o codigo desenvolvido ao longo das aulas num unico projeto console. O
 - Incluir ao menos 3 testes automatizados simples
 
 Bonus: adicione um menu interativo no console para o usuario operar o sistema.
+
+## Definicao de pronto do projeto final
+
+- o sistema cadastra clientes e abre pelo menos dois tipos de conta
+- depositos, saques e transferencias funcionam com validacao observavel
+- existe ao menos uma estrategia de taxa intercambiavel
+- existe ao menos um mecanismo de notificacao de transacao
+- a persistencia usa repositorio com abstracao clara
+- ha extrato ou relatorio consultavel
+- pelo menos 3 testes simples executam sem infraestrutura externa
+- o `Main` demonstra um fluxo completo sem ajustes manuais entre passos
+
+## Fechamento e conexao com a proxima aula
+
+Esta aula fecha a trilha regular: o `MiniBank` chega a `v1.0` com contratos mais expressivos, nulidade explicita, pattern matching e objetos de valor mais adequados. A partir daqui, o projeto final sugerido funciona como consolidacao da jornada inteira.
+
+### Versao esperada apos esta aula
+
+- Versao de entrada: `v0.9`
+- Versao de saida: `v1.0`
+- Classes novas: records e DTOs modernos conforme necessidade
+- Classes alteradas: `Transacao`, `Cliente`, `IConta` e servicos auxiliares
+- Comportamentos novos: igualdade por valor, nullable explicito, pattern matching e implementacoes padrao em interfaces
+- Como testar no Main: executar o programa final, comparar `record`, observar classificacoes e tratar buscas nulas com `?.` e `??`

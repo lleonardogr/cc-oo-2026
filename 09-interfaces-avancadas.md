@@ -1,6 +1,23 @@
 # Aula 9 - Interfaces: DI, Testabilidade e Composicao
 
-## Teoria
+## Objetivo da aula
+
+Consolidar interfaces como base para injecao de dependencia, composicao raiz e testes mais confiaveis no `MiniBank`.
+
+## Pre-requisitos
+
+- dominar a versao `v0.7`
+- compreender interfaces segregadas e Strategy
+- reconhecer o problema de classes que criam suas proprias dependencias
+
+## Ao final, o aluno sera capaz de...
+
+- explicar por que DI reduz acoplamento e aumenta testabilidade
+- separar contrato de implementacao de persistencia
+- montar uma composicao raiz simples
+- escrever testes de comportamento sem depender de banco de dados real
+
+## Teoria essencial
 
 Interfaces sao o mecanismo central para **desacoplamento**, **testabilidade** e **extensibilidade**. A Aula 3 apresentou o basico; aqui aprofundamos com injecao de dependencia, implementacao explicita e testes.
 
@@ -17,9 +34,41 @@ Interfaces sao o mecanismo central para **desacoplamento**, **testabilidade** e 
 
 Em vez de uma classe criar suas dependencias, ela recebe abstracoes via construtor. Isso permite trocar implementacoes sem alterar o consumidor.
 
+## Erros e confusoes comuns
+
+- chamar qualquer construtor com parametro de "DI"
+- injetar interface e ainda instanciar concretos dentro da classe
+- confundir composicao raiz com "lugar qualquer do sistema"
+- tratar teste em memoria como gambiarra, e nao como vantagem de design
+
 ---
 
 ## 🏦 Hands-on: App Bancario — Persistencia e testes via interfaces
+
+### Estado atual do MiniBank
+
+- Versao de entrada: `v0.7`
+- Versao de saida: `v0.8`
+- Classes novas: `IRepositorioCliente`, `IRepositorioConta`, implementacoes em memoria, `ServicoBancario`
+- Classes alteradas: montagem do sistema passa a ocorrer fora das classes de negocio
+- Comportamentos novos: persistencia intercambiavel, servico de negocio com DI, testes sem banco real
+- Como testar no Main: montar o sistema na composicao raiz, abrir contas, transferir e rodar testes com repositorios em memoria
+
+### O que muda nesta aula
+
+As dependencias deixam de nascer escondidas nas classes e passam a ser declaradas como contrato.
+
+### Por que muda
+
+Sem isso, a arquitetura fica dificil de testar, de trocar infraestrutura e de explicar para o aluno onde as decisoes de composicao acontecem.
+
+### Organizando o projeto
+
+1. Reestruture a pasta `Repositories` em subpastas, como `Repositories/Contracts` e `Repositories/InMemory`.
+2. Coloque `IRepositorioCliente.cs` e `IRepositorioConta.cs` em `Repositories/Contracts`.
+3. Coloque `RepositorioClienteEmMemoria.cs` e `RepositorioContaEmMemoria.cs` em `Repositories/InMemory`.
+4. Na pasta `Services`, crie `ServicoBancario.cs`.
+5. Se quiser separar demonstracoes de verificacao, crie `Tests/Manual` com um arquivo `TesteServicoBancario.cs`.
 
 Vamos aplicar DI para permitir trocar a persistencia do MiniBank, e criar testes simples sem banco de dados.
 
@@ -226,9 +275,117 @@ flowchart TD
 
 ---
 
+## Checklist de verificacao da versao
+
+- servicos dependem de interfaces de repositorio, nao de concretos
+- a composicao raiz escolhe as implementacoes reais
+- os testes rodam com repositorios em memoria
+- trocar a implementacao de persistencia nao exige alterar o `ServicoBancario`
+- o aluno consegue explicar por que isso melhora testabilidade
+
 ## Exercicios
 
 1. Crie `IServicoNotificacao` com metodo `Notificar(string destinatario, string mensagem)`. Implemente `NotificacaoConsole` e injete no `ServicoBancario`.
 2. Escreva um teste que verifica se cadastrar cliente duplicado lanca excecao.
 3. Crie `IRelatorioServico` e implemente um `RelatorioConsole` que lista todas as contas e saldos. Injete no servico.
 4. Implemente `RepositorioContaEmArquivo : IRepositorioConta` que salva contas em arquivo texto. Troque na composicao raiz e observe que o `ServicoBancario` nao muda.
+
+### Gabarito comentado
+
+1. Implementacao de referencia:
+
+```csharp
+public interface IServicoNotificacao
+{
+    void Notificar(string destinatario, string mensagem);
+}
+
+public class NotificacaoConsole : IServicoNotificacao
+{
+    public void Notificar(string destinatario, string mensagem)
+    {
+        Console.WriteLine($"[NOTIFICACAO] Para {destinatario}: {mensagem}");
+    }
+}
+```
+
+Criterio de aceitacao:
+- `ServicoBancario` recebe `IServicoNotificacao` no construtor
+- o servico usa a abstracao, nao `Console.WriteLine` direto
+
+2. Implementacao de referencia:
+
+```csharp
+public static void TestarClienteDuplicado()
+{
+    var repoClientes = new RepositorioClienteEmMemoria();
+    var repoContas = new RepositorioContaEmMemoria();
+    var taxa = new TaxaContaPoupanca();
+    var servico = new ServicoBancario(repoClientes, repoContas, taxa);
+
+    servico.CadastrarCliente("Ana", "111.111.111-11", "ana@email.com");
+
+    try
+    {
+        servico.CadastrarCliente("Ana 2", "111.111.111-11", "outro@email.com");
+        Debug.Assert(false, "Deveria ter lancado excecao");
+    }
+    catch (InvalidOperationException)
+    {
+        Debug.Assert(true);
+    }
+}
+```
+
+3. Implementacao de referencia:
+
+```csharp
+public interface IRelatorioServico
+{
+    void Gerar();
+}
+
+public class RelatorioConsole : IRelatorioServico
+{
+    private readonly IRepositorioConta repositorio;
+
+    public RelatorioConsole(IRepositorioConta repositorio)
+    {
+        this.repositorio = repositorio;
+    }
+
+    public void Gerar()
+    {
+        foreach (var conta in repositorio.ListarTodas())
+            Console.WriteLine($"{conta.Numero} | {conta.Titular.Nome} | {conta.Saldo:C}");
+    }
+}
+```
+
+4. Resposta esperada: `RepositorioContaEmArquivo` implementa o mesmo contrato de `IRepositorioConta`. Na composicao raiz, basta trocar:
+
+```csharp
+IRepositorioConta repoContas = new RepositorioContaEmArquivo("contas.txt");
+```
+
+Sinal de que ficou correto:
+- `ServicoBancario` permanece igual
+- apenas a montagem muda
+
+Erros comuns:
+- injetar o servico, mas continuar instanciando o concreto em algum metodo
+- escrever teste dependente de arquivo ou banco sem necessidade
+- misturar composicao raiz com logica de negocio
+
+## Fechamento e conexao com a proxima aula
+
+O `MiniBank` agora tem uma arquitetura mais clara: contratos, montagem externa e testes mais baratos. A Aula 10 volta a generics com mais profundidade para mostrar onde a generalizacao ajuda e onde o dominio continua pedindo especializacao.
+
+### Versao esperada apos esta aula
+
+- Versao de entrada: `v0.7`
+- Versao de saida: `v0.8`
+- Classes novas: interfaces e implementacoes de repositorio, `ServicoBancario`
+- Classes alteradas: montagem do sistema
+- Comportamentos novos: DI, composicao raiz, testes independentes de infraestrutura
+- Como testar no Main: trocar a implementacao do repositorio e reexecutar o mesmo fluxo de negocio

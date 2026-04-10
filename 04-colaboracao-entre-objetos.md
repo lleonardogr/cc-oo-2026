@@ -1,6 +1,23 @@
 # Aula 4 - Colaboracao entre Objetos
 
-## Teoria
+## Objetivo da aula
+
+Aprender a decidir conscientemente como objetos se relacionam, usando criterios observaveis para diferenciar dependencia, associacao, agregacao e composicao.
+
+## Pre-requisitos
+
+- compreender interfaces e hierarquias simples do `MiniBank`
+- saber identificar campos, parametros e criacao de objetos
+- dominar a versao `v0.3`
+
+## Ao final, o aluno sera capaz de...
+
+- classificar relacoes entre objetos com justificativa tecnica
+- usar ciclo de vida e ownership como heuristicas de modelagem
+- explicar por que colaboracao entre objetos e tao importante quanto definicao de classes
+- evoluir o `MiniBank` com `Banco`, `Extrato`, `Transacao` e servicos auxiliares
+
+## Teoria essencial
 
 POO nao e apenas criar classes — e fazer essas classes cooperarem. Saber **como** conectar objetos e tao importante quanto saber cria-los. O tipo de relacao escolhido impacta diretamente a flexibilidade, a manutenibilidade e a testabilidade do sistema.
 
@@ -180,6 +197,13 @@ flowchart LR
     end
 ```
 
+## Erros e confusoes comuns
+
+- achar que "ter um campo" significa automaticamente composicao
+- confundir quem cria com quem possui o ciclo de vida
+- chamar qualquer uso de outro objeto de associacao
+- desenhar UML sem conseguir justificar a decisao no codigo
+
 ## Heranca como relacao (Is-A vs Has-A revisitado)
 
 Heranca tambem e uma forma de relacao — a mais forte de todas. Conforme discutido na Aula 2:
@@ -214,6 +238,31 @@ No segundo exemplo, se `Pilha<T>` herdasse de `List<T>`, o usuario poderia chama
 ---
 
 ## 🏦 Hands-on: App Bancario — Relacoes entre objetos
+
+### Estado atual do MiniBank
+
+- Versao de entrada: `v0.3`
+- Versao de saida: `v0.4`
+- Classes novas: `Banco`, `Transacao`, `Extrato`, `EmissorExtrato`
+- Classes alteradas: `ContaBase`, `ContaCorrente`
+- Comportamentos novos: extrato composto pela conta, transferencia, abertura de contas via banco, emissao de resumo
+- Como testar no Main: abrir contas, registrar transacoes e emitir extrato de mais de uma conta
+
+### O que muda nesta aula
+
+O `MiniBank` deixa de ser apenas um conjunto de entidades isoladas e passa a ter colaboracoes explicitas entre conta, banco, extrato e transacao.
+
+### Por que muda
+
+Modelar objetos sem modelar relacoes gera sistemas artificiais. Esta aula mostra como ownership, dependencia e ciclo de vida moldam o design.
+
+### Organizando o projeto
+
+1. Crie a pasta `Models/Transacoes` para representar `Transacao` e `Extrato`.
+2. Crie a pasta `Models/Banco` se quiser separar a classe `Banco` do restante do dominio.
+3. Adicione os arquivos `Models/Transacoes/Transacao.cs` e `Models/Transacoes/Extrato.cs`.
+4. Adicione `Models/Banco/Banco.cs`.
+5. Crie a pasta `Services` e coloque `EmissorExtrato.cs` nela, para deixar claro que se trata de um colaborador do dominio e nao de uma entidade principal.
 
 Vamos aplicar cada tipo de relacao no MiniBank.
 
@@ -470,6 +519,14 @@ sequenceDiagram
 
 ---
 
+## Checklist de verificacao da versao
+
+- `ContaBase` tem um `Extrato` que nasce e vive com ela
+- `Extrato` registra `Transacao` como parte da conta
+- `Banco` agrega clientes e contas sem ser dono absoluto do ciclo de vida delas
+- `EmissorExtrato` usa `IConta` apenas como dependencia
+- o aluno consegue justificar uma classificacao usando criacao, armazenamento e sobrevida dos objetos
+
 ## Exercicios
 
 1. Para cada par abaixo, classifique a relacao como dependencia, associacao, agregacao ou composicao. Justifique:
@@ -486,3 +543,75 @@ sequenceDiagram
 4. Refatore o MiniBank para que `Banco` receba contas de fora (`AdicionarConta(IConta)`) em vez de cria-las internamente. Como isso muda o tipo de relacao?
 
 5. Considere a frase: "Um Aluno tem Notas. Se o Aluno for excluido, as Notas perdem sentido." Que tipo de relacao e essa? Implemente em codigo.
+
+### Gabarito comentado
+
+1. Resposta esperada:
+- Universidade e Departamento: agregacao, se departamentos puderem existir fora de uma universidade especifica
+- Departamento e Professor: associacao ou agregacao, dependendo do modelo; uma resposta boa precisa justificar a independencia de ciclo de vida
+- Pedido e ItemPedido: composicao
+- Impressora e Documento: dependencia
+- Empresa e Funcionario: agregacao
+
+Criterio de correcao: em pares com nuance, o importante e justificar usando criacao, posse e sobrevivencia.
+
+2. Resposta esperada: ha um argumento forte para composicao porque o `Banco` cria a conta internamente. Ainda assim, se a conta puder ser transferida para outro contexto e existir fora do banco, o modelo pode ser tratado como agregacao no dominio. O essencial e explicitar a tensao entre `quem cria` e `quem controla o ciclo de vida`.
+3. Implementacao de referencia:
+
+```csharp
+public class Relatorio
+{
+    public void GerarResumo(Banco banco)
+    {
+        foreach (var conta in banco.ListarContas())
+            Console.WriteLine($"{conta.Numero} | {conta.Titular.Nome} | {conta.Saldo:C}");
+    }
+}
+```
+
+Como verificar:
+- `Relatorio` nao armazena o `Banco`
+- o `Banco` aparece apenas como parametro, logo a relacao e dependencia
+
+4. Resposta esperada: ao receber `IConta` de fora, `Banco` enfraquece sua relacao com a conta e a classificacao tende de composicao para agregacao.
+5. Resposta esperada: composicao. Implementacao de referencia:
+
+```csharp
+public class Nota
+{
+    public string Disciplina { get; }
+    public decimal Valor { get; }
+
+    public Nota(string disciplina, decimal valor)
+    {
+        Disciplina = disciplina;
+        Valor = valor;
+    }
+}
+
+public class Aluno
+{
+    private readonly List<Nota> notas = new();
+
+    public void AdicionarNota(string disciplina, decimal valor)
+        => notas.Add(new Nota(disciplina, valor));
+}
+```
+
+Erros comuns:
+- classificar tudo que "tem lista" como agregacao
+- justificar so com UML, sem falar do codigo
+- no exercicio 2, responder apenas "sim" ou "nao" sem discutir criterio
+
+## Fechamento e conexao com a proxima aula
+
+Com o `MiniBank` em `v0.4`, o aluno ja consegue enxergar um pequeno sistema, e nao apenas classes isoladas. A Aula 5 usa esse momento para modelar o que foi construido e para planejar o que ainda falta.
+
+### Versao esperada apos esta aula
+
+- Versao de entrada: `v0.3`
+- Versao de saida: `v0.4`
+- Classes novas: `Banco`, `Transacao`, `Extrato`, `EmissorExtrato`
+- Classes alteradas: `ContaBase`, `ContaCorrente`
+- Comportamentos novos: transferencia, registro de extrato, abertura de contas, emissao de resumo
+- Como testar no Main: executar transferencia, emitir extrato e identificar no codigo onde cada relacao aparece

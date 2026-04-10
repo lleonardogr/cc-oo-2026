@@ -1,6 +1,23 @@
 # Aula 3 - Recursos de POO em C#
 
-## Teoria
+## Objetivo da aula
+
+Usar recursos de `C#` para materializar decisoes de design orientado a objetos, sem transformar a aula em um catalogo de sintaxe.
+
+## Pre-requisitos
+
+- compreender a versao `v0.2` do `MiniBank`
+- reconhecer interface, classe abstrata e sobrescrita
+- saber ler hierarquias simples em `C#`
+
+## Ao final, o aluno sera capaz de...
+
+- distinguir contrato, implementacao compartilhada e especializacao
+- usar interfaces segregadas para reduzir acoplamento
+- aplicar validacao em propriedades e modificadores de acesso com intencao de design
+- explicar quando `sealed` e util e por que `partial` nao e uma ferramenta de modelagem
+
+## Teoria essencial
 
 O EPUB usa recursos especificos de `C#` para materializar os pilares: interfaces, classes abstratas, parciais, seladas, propriedades e modificadores de acesso.
 
@@ -53,9 +70,41 @@ flowchart TD
     E -->|Nao| G[Classe normal]
 ```
 
+## Erros e confusoes comuns
+
+- tratar interface como "classe mais fraca"
+- usar `sealed` sem justificar a intencao de impedir extensao
+- pensar em `partial` como recurso principal de OO
+- validar estado so no `Main`, e nao na propria entidade
+
 ---
 
 ## 🏦 Hands-on: App Bancario — Interfaces multiplas e propriedades robustas
+
+### Estado atual do MiniBank
+
+- Versao de entrada: `v0.2`
+- Versao de saida: `v0.3`
+- Classes novas: `IDebitavel`, `ICreditavel`, `IExibivel`, `ConfiguracaoBanco`
+- Classes alteradas: `IConta`, `Cliente`, `ContaBase`
+- Comportamentos novos: interfaces segregadas, propriedades com validacao real, configuracao selada
+- Como testar no Main: instanciar contas via `IConta`, usar `IExibivel` separadamente e disparar validacoes invalidas
+
+### O que muda nesta aula
+
+O modelo continua parecido com o da Aula 2, mas agora os contratos ficam mais finos e o controle de acesso mais intencional.
+
+### Por que muda
+
+Nem todo consumidor precisa do pacote completo de uma conta. Segregar contratos e endurecer validacoes prepara o terreno para desacoplamento e manutencao.
+
+### Organizando o projeto
+
+1. Reaproveite a pasta `Contracts` e adicione os arquivos `IDebitavel.cs`, `ICreditavel.cs` e `IExibivel.cs`.
+2. Atualize `Contracts/IConta.cs` para compor os contratos menores.
+3. Na pasta `Models`, mantenha `Cliente.cs`.
+4. Na pasta `Models/Contas`, atualize `ContaBase.cs`, `ContaCorrente.cs` e `ContaPoupanca.cs`.
+5. Crie a pasta `Configuration` e adicione `ConfiguracaoBanco.cs` para a classe selada de configuracao.
 
 Na v0.2 temos hierarquia de contas. Agora vamos adicionar **interfaces segregadas**, uma **classe selada** para configuracao e **propriedades com validacao real**.
 
@@ -226,8 +275,84 @@ classDiagram
 
 ---
 
+## Checklist de verificacao da versao
+
+- `IConta` foi decomposta em interfaces menores com foco claro
+- `Cliente` valida dados ao receber entradas inconsistentes
+- `ContaBase` protege o saldo por meio de `protected set`
+- `ConfiguracaoBanco` nao pode ser herdada
+- o aluno consegue explicar por que interface e contrato e nao deposito de codigo comum
+
 ## Exercicios
 
 1. Crie uma interface `ITransferivel` com metodo `Transferir(IConta destino, decimal valor)`. Implemente em `ContaCorrente` (que cobra taxa de R$5) e `ContaPoupanca` (sem taxa).
 2. Tente criar uma classe que herde de `ConfiguracaoBanco` e observe o erro do compilador.
 3. Adicione validacao de CPF (exatamente 14 caracteres com formato `XXX.XXX.XXX-XX`).
+
+### Gabarito comentado
+
+1. Implementacao de referencia:
+
+```csharp
+public interface ITransferivel
+{
+    bool Transferir(IConta destino, decimal valor);
+}
+
+public class ContaCorrente : ContaBase, ITransferivel
+{
+    public bool Transferir(IConta destino, decimal valor)
+    {
+        decimal total = valor + 5m;
+        if (!Sacar(total)) return false;
+        destino.Depositar(valor);
+        return true;
+    }
+}
+
+public class ContaPoupanca : ContaBase, ITransferivel
+{
+    public bool Transferir(IConta destino, decimal valor)
+    {
+        if (!Sacar(valor)) return false;
+        destino.Depositar(valor);
+        return true;
+    }
+}
+```
+
+Como verificar:
+- uma transferencia de `100m` na corrente reduz `105m`
+- uma transferencia de `100m` na poupanca reduz `100m`
+
+2. Resposta esperada: o compilador rejeita algo como `class MinhaConfig : ConfiguracaoBanco` com erro indicando que tipo `sealed` nao pode ser base.
+3. Implementacao de referencia:
+
+```csharp
+private static bool CpfValido(string cpf)
+{
+    return Regex.IsMatch(cpf, "^\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}$");
+}
+```
+
+Criterio de aceitacao:
+- CPF com formato `123.456.789-00` passa
+- CPF `123` ou `12345678900` falha
+
+Erros comuns:
+- colocar `Transferir` em `IConta` sem necessidade
+- usar `Contains` ou `Length == 14` como unica validacao de CPF formatado
+- dizer que `sealed` melhora design sem explicar o que se quer impedir
+
+## Fechamento e conexao com a proxima aula
+
+Agora o `MiniBank` tem contratos mais finos e entidades mais protegidas. A Aula 4 amplia a discussao do "objeto isolado" para "objetos que colaboram", que e onde o design realmente comeca a ganhar forma.
+
+### Versao esperada apos esta aula
+
+- Versao de entrada: `v0.2`
+- Versao de saida: `v0.3`
+- Classes novas: `IDebitavel`, `ICreditavel`, `IExibivel`, `ConfiguracaoBanco`
+- Classes alteradas: `IConta`, `Cliente`, `ContaBase`
+- Comportamentos novos: interfaces segregadas, validacao de propriedades, configuracao selada
+- Como testar no Main: executar o bloco da aula e confirmar excecoes de validacao e uso de `IExibivel`

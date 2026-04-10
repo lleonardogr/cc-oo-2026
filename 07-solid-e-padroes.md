@@ -1,6 +1,23 @@
 # Aula 7 - SOLID e Padroes de Projeto
 
-## Teoria
+## Objetivo da aula
+
+Usar SOLID como ferramenta de diagnostico de design e aplicar Strategy no `MiniBank` para substituir logica rigida por comportamento intercambiavel.
+
+## Pre-requisitos
+
+- dominar a versao `v0.5`
+- compreender interfaces, heranca, excecoes e eventos basicos
+- reconhecer responsabilidades misturadas em uma classe
+
+## Ao final, o aluno sera capaz de...
+
+- explicar os principios SOLID em termos de impacto no design
+- identificar SRP, OCP, DIP e ISP no `MiniBank`
+- extrair uma variacao de algoritmo para Strategy
+- justificar uma refatoracao com ganho de extensibilidade
+
+## Teoria essencial
 
 Os principios SOLID (Robert C. Martin) guiam a escrita de codigo limpo e extensivel:
 
@@ -14,9 +31,40 @@ Os principios SOLID (Robert C. Martin) guiam a escrita de codigo limpo e extensi
 
 Encapsula familias de algoritmos em classes separadas, tornando-os intercambiaveis. Combina polimorfismo com Open/Closed.
 
+## Erros e confusoes comuns
+
+- tratar SOLID como checklist decorado
+- criar interface para tudo sem variacao real
+- chamar qualquer classe de servico de "boa arquitetura"
+- usar Strategy quando um parametro simples resolveria
+
 ---
 
 ## 🏦 Hands-on: App Bancario — Aplicando SOLID e Strategy
+
+### Estado atual do MiniBank
+
+- Versao de entrada: `v0.5`
+- Versao de saida: `v0.6`
+- Classes novas: `ServicoTransferencia`, `ICalculadoraTaxa`, `TaxaContaCorrente`, `TaxaContaPoupanca`, `TaxaContaPremium`
+- Classes alteradas: regras de transferencia deixam de ficar em `ContaCorrente`
+- Comportamentos novos: taxa intercambiavel, servico orquestrador, dependencia de abstracoes
+- Como testar no Main: executar a mesma transferencia com estrategias de taxa diferentes
+
+### O que muda nesta aula
+
+Parte da logica de negocio sai da entidade e vai para servicos e estrategias que podem variar sem alterar clientes.
+
+### Por que muda
+
+Depois que o sistema cresce, manter toda decisao dentro de uma unica classe deixa o design rigido e dificulta teste, manutencao e extensao.
+
+### Organizando o projeto
+
+1. Reaproveite a pasta `Services` e adicione `ServicoTransferencia.cs`.
+2. Crie a pasta `Strategies` para as estrategias de taxa.
+3. Dentro de `Strategies`, crie `ICalculadoraTaxa.cs`, `TaxaContaCorrente.cs`, `TaxaContaPoupanca.cs` e `TaxaContaPremium.cs`.
+4. Se existir logica de transferencia dentro de `ContaCorrente.cs`, remova ou reduza essa responsabilidade para deixar o fluxo concentrado no servico.
 
 Vamos refatorar o MiniBank para seguir SOLID e introduzir o padrao Strategy para calculo de taxas.
 
@@ -191,9 +239,89 @@ servicoPremium.Executar(ccAna, ccJoao, 500m);
 
 ---
 
+## Checklist de verificacao da versao
+
+- `ServicoTransferencia` orquestra a transferencia sem embutir tudo na conta
+- `ICalculadoraTaxa` permite trocar comportamento sem editar o servico
+- o aluno consegue apontar um exemplo de DIP no `MiniBank`
+- a mesma transferencia roda com estrategias diferentes
+- o aluno consegue justificar a refatoracao em termos de extensibilidade e manutencao
+
 ## Exercicios
 
 1. Crie `TaxaTransferenciaGratuita` que isenta transferencias acima de R$5.000.
 2. Refatore o `Banco` (Aula 4) para receber `IRepositorioConta` via construtor (DIP).
 3. Identifique no MiniBank atual se alguma classe ainda viola SRP. Refatore.
 4. Crie um `ServicoRelatorio` que dependa de `IRepositorioConta` e gere um resumo do banco.
+
+### Gabarito comentado
+
+1. Implementacao de referencia:
+
+```csharp
+public class TaxaTransferenciaGratuita : ICalculadoraTaxa
+{
+    public decimal Calcular(decimal valor) => valor > 5000m ? 0m : valor * 0.02m;
+}
+```
+
+Como verificar:
+- `Calcular(6000m)` retorna `0`
+- `Calcular(1000m)` retorna `20`
+
+2. Solucao de referencia:
+
+```csharp
+public class Banco
+{
+    private readonly IRepositorioConta repositorioContas;
+
+    public Banco(IRepositorioConta repositorioContas)
+    {
+        this.repositorioContas = repositorioContas;
+    }
+}
+```
+
+Criterio de aceitacao:
+- `Banco` nao cria concretamente o repositorio
+- o chamador decide qual implementacao injetar
+
+3. Resposta esperada: exemplos validos incluem `Banco` acumulando abertura de conta, armazenamento e coordenacao de operacoes, ou outro ponto em que uma classe tenha mais de uma razao para mudar. A refatoracao pode extrair servico ou colaborador especializado.
+4. Implementacao de referencia:
+
+```csharp
+public class ServicoRelatorio
+{
+    private readonly IRepositorioConta repositorio;
+
+    public ServicoRelatorio(IRepositorioConta repositorio)
+    {
+        this.repositorio = repositorio;
+    }
+
+    public void GerarResumo()
+    {
+        foreach (var conta in repositorio.ListarTodas())
+            Console.WriteLine($"{conta.Numero} | {conta.Titular.Nome} | {conta.Saldo:C}");
+    }
+}
+```
+
+Erros comuns:
+- criar uma nova estrategia que ainda depende de `if` por tipo de conta
+- injetar interface, mas instanciar concreto dentro do construtor
+- dizer "SRP violado" sem propor uma nova fronteira de responsabilidade
+
+## Fechamento e conexao com a proxima aula
+
+Depois desta refatoracao, o aluno ja enxerga o `MiniBank` como um sistema com pontos de variacao controlados. A Aula 8 aprofunda o mecanismo de delegates para montar pipelines e notificacoes mais flexiveis.
+
+### Versao esperada apos esta aula
+
+- Versao de entrada: `v0.5`
+- Versao de saida: `v0.6`
+- Classes novas: `ServicoTransferencia`, estrategias de taxa
+- Classes alteradas: transferencia deixa de ficar dentro da conta
+- Comportamentos novos: calculo intercambiavel de taxa e dependencia de abstracoes
+- Como testar no Main: trocar a estrategia de taxa e observar mudanca de comportamento sem alterar o servico
